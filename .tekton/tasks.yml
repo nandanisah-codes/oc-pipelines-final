@@ -1,0 +1,44 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cleanup
+spec:
+  workspaces:
+    - name: source
+  steps:
+    - name: remove
+      image: alpine:3
+      env:
+        - name: WORKSPACE_SOURCE_PATH
+          value: $(workspaces.source.path)
+      command: ["/bin/sh", "-c"]
+      args:
+        - >-
+          set -eu
+          if [ "$(workspaces.source.bound)" == "true" ]; then
+            echo "Deleting all files from the workspace..."
+            rm -rf "$(workspaces.source.path)"/*
+            echo "Workspace cleaned up successfully."
+          fi
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: nose
+spec:
+  workspaces:
+    - name: source
+  params:
+    - name: UnitTestArgs
+      description: Arguments for nosetests
+      type: string
+      default: "-v --with-spec --spec-color"
+  steps:
+    - name: nosetests
+      image: python:3.11-slim
+      workingDir: $(workspaces.source.path)
+      script: |
+        #!/bin/bash
+        set -e
+        pip install -r requirements.txt
+        nosetests $(params.UnitTestArgs)
